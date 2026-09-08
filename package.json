@@ -1,0 +1,48 @@
+{
+  "name": "elevenlabs-voice-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A small text-to-speech studio built on the ElevenLabs API: a React + TypeScript front end with a Node proxy that keeps the API key server-side.",
+  "type": "module",
+  "engines": {
+    "node": ">=18.17"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n web,api -c cyan,magenta \"npm:dev:web\" \"npm:dev:api\"",
+    "dev:web": "vite",
+    "dev:api": "node --env-file-if-exists=.env --watch server/index.mjs",
+    "build": "npm run typecheck && vite build",
+    "preview": "vite preview",
+    "start": "node --env-file-if-exists=.env server/index.mjs",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.17.10",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.0",
+    "eslint": "^9.17.0",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "eslint-plugin-react-refresh": "^0.4.16",
+    "globals": "^15.14.0",
+    "jsdom": "^25.0.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.1",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.8"
+  }
+}
