@@ -18,6 +18,42 @@ function num(value, fallback) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+/**
+ * Turn an ElevenLabs error response body into a readable message plus, when we
+ * recognise the failure, a hint about how to fix it. ElevenLabs wraps errors as
+ * `{ detail: string }`, `{ detail: { status, message } }`, or a validation array.
+ */
+function describeUpstreamError(rawText) {
+  let message = rawText.slice(0, 300);
+  let status;
+  try {
+    const body = JSON.parse(rawText);
+    const detail = body?.detail;
+    if (typeof detail === 'string') {
+      message = detail;
+    } else if (Array.isArray(detail)) {
+      const parts = detail.map((d) => d?.msg).filter(Boolean);
+      if (parts.length) message = parts.join('; ');
+    } else if (detail && typeof detail === 'object') {
+      status = detail.status;
+      message = detail.message ?? detail.msg ?? message;
+    }
+  } catch {
+    // not JSON, keep the raw slice
+  }
+
+  let hint;
+  if (status === 'missing_permissions' || /missing the permission/i.test(message)) {
+    hint =
+      'Open the key in the ElevenLabs dashboard (Profile → API Keys → Edit) and grant it ' +
+      'Text to Speech and Voices (Read), or remove the restrictions.';
+  } else if (status === 'detected_unusual_activity' || /quota/i.test(message)) {
+    hint = 'This looks like a plan or quota limit on the ElevenLabs account.';
+  }
+
+  return { message, hint };
+}
+
 function requireApiKey(_req, res, next) {
   if (!process.env.ELEVENLABS_API_KEY) {
     res.status(503).json({
@@ -49,10 +85,10 @@ export function createServer() {
       });
 
       if (!upstream.ok) {
-        const detail = await upstream.text();
+        const { message, hint } = describeUpstreamError(await upstream.text());
         res.status(upstream.status).json({
-          error: 'ElevenLabs rejected the voices request.',
-          detail: detail.slice(0, 500),
+          error: message || 'ElevenLabs rejected the voices request.',
+          hint,
         });
         return;
       }
@@ -115,10 +151,11 @@ export function createServer() {
       });
 
       if (!upstream.ok || !upstream.body) {
-        const detail = await upstream.text().catch(() => '');
+        const raw = await upstream.text().catch(() => '');
+        const { message, hint } = describeUpstreamError(raw);
         res.status(upstream.status || 502).json({
-          error: 'ElevenLabs rejected the synthesis request.',
-          detail: detail.slice(0, 500),
+          error: message || 'ElevenLabs rejected the synthesis request.',
+          hint,
         });
         return;
       }
@@ -155,4 +192,4 @@ export function createServer() {
   return app;
 }
 
-export { TEXT_MAX, DEFAULT_MODEL };
+export { TEXT_MAX, DEFAULT_MODEL, describeUpstreamError };

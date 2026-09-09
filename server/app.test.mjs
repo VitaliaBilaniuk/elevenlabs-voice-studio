@@ -1,6 +1,33 @@
 // @vitest-environment node
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createServer } from './app.mjs';
+import { createServer, describeUpstreamError } from './app.mjs';
+
+describe('describeUpstreamError', () => {
+  it('pulls the message out of ElevenLabs\' nested detail object', () => {
+    const raw = JSON.stringify({
+      detail: {
+        status: 'missing_permissions',
+        message: 'The API key you used is missing the permission voices_read to execute this operation.',
+      },
+    });
+    const { message, hint } = describeUpstreamError(raw);
+    expect(message).toMatch(/missing the permission voices_read/);
+    expect(hint).toMatch(/API Keys/);
+  });
+
+  it('handles a plain string detail and a validation array', () => {
+    expect(describeUpstreamError('{"detail":"nope"}').message).toBe('nope');
+    expect(
+      describeUpstreamError('{"detail":[{"msg":"field required"},{"msg":"bad value"}]}').message,
+    ).toBe('field required; bad value');
+  });
+
+  it('falls back to a trimmed raw slice for non-JSON bodies', () => {
+    const { message, hint } = describeUpstreamError('upstream 502 gateway error');
+    expect(message).toBe('upstream 502 gateway error');
+    expect(hint).toBeUndefined();
+  });
+});
 
 let server;
 let base;

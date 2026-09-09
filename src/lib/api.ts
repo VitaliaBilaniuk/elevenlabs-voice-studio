@@ -18,6 +18,7 @@ async function readError(response: Response): Promise<ApiError> {
   try {
     const data = await response.json();
     if (typeof data?.error === 'string') message = data.error;
+    if (typeof data?.hint === 'string' && data.hint) message = `${message} ${data.hint}`;
     if (typeof data?.detail === 'string') detail = data.detail;
   } catch {
     // non-JSON body, keep the generic message
