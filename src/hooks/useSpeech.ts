@@ -37,7 +37,7 @@ export function useSpeech(): UseSpeech {
     setStatus('loading');
     setError(null);
     try {
-      const blob = await synthesize(request);
+      const blob = await synthesize({ ...request, voiceName });
       const clip: SpeechClip = {
         id: nextId(),
         text: request.text,

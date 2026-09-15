@@ -19,6 +19,24 @@ export interface SpeechRequest extends VoiceSettings {
   text: string;
   voiceId: string;
   modelId?: string;
+  /** Display-only, for the persisted clip history. Never sent on to ElevenLabs. */
+  voiceName?: string;
+}
+
+export interface HistoryClip {
+  id: string;
+  voiceId: string;
+  voiceName: string;
+  textPreview: string;
+  characterCount: number;
+  bytes: number;
+  createdAt: string;
+}
+
+export interface ClipStats {
+  totalClips: number;
+  totalCharacters: number;
+  topVoice: string | null;
 }
 
 export interface SpeechClip {

@@ -3,18 +3,29 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
 import { fetchVoices, synthesize } from '../lib/api';
+import { queryGraphQL } from '../lib/graphql';
 
 vi.mock('../lib/api', async () => {
   const actual = await vi.importActual<typeof import('../lib/api')>('../lib/api');
   return { ...actual, fetchVoices: vi.fn(), synthesize: vi.fn() };
 });
 
+// The History panel queries this on mount; without a mock it would hit a
+// real (server-less, in these tests) /api/graphql and fail every test with
+// an unrelated "History" error state.
+vi.mock('../lib/graphql', async () => {
+  const actual = await vi.importActual<typeof import('../lib/graphql')>('../lib/graphql');
+  return { ...actual, queryGraphQL: vi.fn() };
+});
+
 const mockFetchVoices = vi.mocked(fetchVoices);
 const mockSynthesize = vi.mocked(synthesize);
+const mockQueryGraphQL = vi.mocked(queryGraphQL);
 
 beforeEach(() => {
   mockFetchVoices.mockReset();
   mockSynthesize.mockReset();
+  mockQueryGraphQL.mockReset();
   mockFetchVoices.mockResolvedValue([
     {
       voiceId: 'v1',
@@ -25,6 +36,10 @@ beforeEach(() => {
       labels: {},
     },
   ]);
+  mockQueryGraphQL.mockResolvedValue({
+    clips: [],
+    clipStats: { totalClips: 0, totalCharacters: 0, topVoice: null },
+  });
 });
 
 describe('<App>', () => {

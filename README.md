@@ -3,11 +3,14 @@
 A small text-to-speech studio built on the [ElevenLabs](https://elevenlabs.io) API.
 Type a script, pick a voice, tune the delivery, and get an MP3 back. The browser
 never sees the API key: every request goes through a thin Node proxy that adds the
-`xi-api-key` header server-side.
+`xi-api-key` header server-side. Every synthesis is also logged to MongoDB, and a
+GraphQL endpoint over that history powers a "what have I generated" panel — the
+data layer this README's [Data & GraphQL](#data--graphql) section walks through.
 
-Built as a focused sample: React 18 + TypeScript on the front, Express on the back,
-Vitest for the tests, and a CI workflow that runs lint, types, tests, and the build
-on every push.
+Built as a focused sample: React 18 + TypeScript on the front, Express + MongoDB +
+GraphQL on the back, Vitest for the tests (including a real, ephemeral MongoDB in
+CI, not a mock), and a CI workflow that runs lint, types, tests, and the build on
+every push.
 
 ![Voice Studio, light theme](docs/screenshot.png)
 
@@ -52,6 +55,12 @@ You need an ElevenLabs API key with text-to-speech access. Create one under
 the UI works, but every synthesis request comes back as a `503` with a message
 saying so.
 
+MongoDB is optional and only backs the History panel — synthesis works without it.
+Point `MONGODB_URI` in `.env` at any MongoDB (a local `mongod`, Atlas, whatever);
+with nothing set it defaults to `mongodb://127.0.0.1:27017/voice-studio`, and if
+that isn't reachable the History panel just shows an error instead of breaking
+the rest of the app.
+
 ## Scripts
 
 | Script              | What it does                                             |
@@ -68,20 +77,28 @@ saying so.
 
 ```
 server/
-  app.mjs         Express app: /api/health, /api/voices, /api/tts. Exported
-                  separately from index.mjs so tests can hit it without a port.
-  index.mjs       Binds the port.
-  app.test.mjs    Route tests (node environment).
+  app.mjs             Express app: /api/health, /api/voices, /api/tts, /api/graphql.
+                      Exported separately from index.mjs so tests can hit it without a port.
+  index.mjs           Binds the port.
+  db.mjs              Lazy, cached MongoDB connection (reads MONGODB_URI at call time).
+  clips.mjs           Data access: recordClip / listClips / clipStats.
+  schema.mjs          GraphQL SDL + resolvers over clips.mjs (read-only).
+  app.test.mjs        Route tests (node environment) — includes the no-Mongo resilience case.
+  clips.test.mjs      Data-layer tests against a real ephemeral MongoDB.
+  graphql.test.mjs    End-to-end: real HTTP request → GraphQL → real Mongo → response.
+  test-mongo.mjs      Shared helper: boots a pinned-version in-memory MongoDB for tests.
 
 src/
   lib/
-    api.ts        fetch wrappers + a typed ApiError
-    format.ts     byte / time / text formatting helpers
+    api.ts            fetch wrappers + a typed ApiError
+    graphql.ts        minimal GraphQL-over-HTTP client (no Apollo/urql — two queries, hand-rolled)
+    format.ts         byte / time / text formatting helpers
   hooks/
-    useVoices.ts  loads the account's voices, abortable, with reload
-    useSpeech.ts  synthesis + a bounded, self-cleaning clip history
-    useTheme.ts   light / dark, persisted
-  components/     Header, TextInput, VoicePicker, VoiceSettings, ResultList, StatusBar
+    useVoices.ts       loads the account's voices, abortable, with reload
+    useSpeech.ts       synthesis + a bounded, self-cleaning clip history
+    useClipHistory.ts  persisted history + stats via GraphQL, reloads after each synthesis
+    useTheme.ts        light / dark, persisted
+  components/     Header, TextInput, VoicePicker, VoiceSettings, ResultList, HistoryPanel, StatusBar
   App.tsx         wiring
   test/           format, useSpeech, VoiceSettings, App and accessibility specs + setup
                   a11y.ts wraps axe-core into a single assertion helper
@@ -98,7 +115,50 @@ src/
  Blob  ◀───────────────────  pipe upstream → response
  URL.createObjectURL(blob)
  <audio src=blob:…>
+                             recordClip(...) — fired, not awaited ────▶ MongoDB
 ```
+
+```
+ browser                     proxy (server/app.mjs)            MongoDB
+ ───────                     ─────────────────────             ───────
+ POST /api/graphql ───────▶  graphql-http → schema.mjs
+ { query: "{ clips {..} }" } resolvers call clips.mjs   ────────▶ find / aggregate
+ { data: { clips: [...] } } ◀────────────────────────  ◀──────── documents
+```
+
+## Data & GraphQL
+
+Every successful synthesis is recorded to MongoDB — not the audio (that stays a
+client-side blob URL, gone on refresh), just the metadata: voice, a text preview,
+character count, byte size, timestamp. A small GraphQL API reads it back for the
+History panel.
+
+- **Why GraphQL only for reads, and REST for everything else.** `/api/tts` and
+  `/api/voices` stay plain REST proxy routes — streaming binary audio through a
+  GraphQL resolver is awkward and buys nothing. GraphQL is used where it actually
+  earns its place: `clips(limit, voiceId)` and `clipStats` are shaped, filterable
+  reads over one collection, which is exactly the case a query language is good
+  at and a REST resource per shape isn't. One schema, `server/schema.mjs`, no
+  mutations — writes happen from inside the `/api/tts` handler, which already has
+  the byte count in hand as it streams.
+- **History never blocks or breaks synthesis.** `recordClip(...)` is called
+  fire-and-forget (not awaited) after the response has already started streaming.
+  If Mongo is down, synthesis still works and `/api/graphql` degrades to a
+  well-formed GraphQL error instead of a 500 — see the "no Mongo available" case
+  in `app.test.mjs`.
+- **Tests run against a real MongoDB, not a mock.** `mongodb-memory-server` boots
+  an actual `mongod` in-process for `clips.test.mjs` and `graphql.test.mjs`
+  (which drives the whole path: real HTTP request → Express → GraphQL → Mongo →
+  response). It's pinned to `7.0.14` in `server/test-mongo.mjs` — the default
+  latest binary is built for a newer macOS baseline than some dev machines
+  actually run, and fails at launch with a missing-symbol dyld error there; the
+  pin has nothing to do with which `mongodb` driver version the app itself uses.
+- **One `graphql` module instance across test files.** `graphql-js` does
+  `instanceof` checks internally, and Vitest's default per-file module graph can
+  end up with two live copies of the same package across test files, which then
+  fails with "Cannot use GraphQLSchema from another module or realm" even though
+  it's one package on disk. `vite.config.ts` inlines `graphql`/`graphql-http` in
+  the test config to force a single shared instance.
 
 ## Accessibility
 
@@ -134,11 +194,13 @@ using assistive tech would notice.
 
 ## Notes and limits
 
-- The proxy streams the MP3 straight through; it never writes audio to disk.
+- The proxy streams the MP3 straight through; it never writes audio to disk. Only
+  metadata (not the audio) is persisted to MongoDB, for history.
 - Text is capped at 2,500 characters per request (ElevenLabs' single-request limit
   on smaller plans). The counter turns red past that and the button disables.
-- No auth, no database, no rate limiting. It is a sample, not a service. For a real
-  deployment you would put the proxy behind auth and a per-user quota.
+- No auth, no per-user data, no rate limiting — clip history is global, not scoped
+  to a user. It is a sample, not a service. For a real deployment you would put
+  the proxy behind auth, scope history per account, and add a per-user quota.
 
 ## License
 

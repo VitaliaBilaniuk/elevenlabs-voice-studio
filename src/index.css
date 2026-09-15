@@ -400,6 +400,58 @@ input[type='checkbox']:focus-visible {
   color: var(--danger);
 }
 
+/* History (persisted, via GraphQL) ------------------------ */
+.history {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.history__row {
+  display: grid;
+  grid-template-columns: minmax(70px, auto) 1fr minmax(90px, auto);
+  gap: 10px;
+  align-items: baseline;
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+
+.history__row:first-child {
+  border-top: none;
+}
+
+.history__voice {
+  font-weight: 600;
+}
+
+.history__text {
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history__meta {
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 520px) {
+  .history__row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .history__meta {
+    text-align: left;
+  }
+}
+
 /* Clips -------------------------------------------------- */
 .clips {
   list-style: none;

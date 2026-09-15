@@ -11,4 +11,10 @@ createServer().listen(PORT, () => {
         'then restart. Requests will return 503 until it is set.',
     );
   }
+  if (!process.env.MONGODB_URI) {
+    console.warn(
+      `No MONGODB_URI set; defaulting to mongodb://127.0.0.1:27017/voice-studio. ` +
+        'Synthesis still works without Mongo — only clip history (GraphQL) needs it.',
+    );
+  }
 });

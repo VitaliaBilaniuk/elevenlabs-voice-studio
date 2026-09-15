@@ -34,6 +34,11 @@ let base;
 
 beforeAll(async () => {
   delete process.env.ELEVENLABS_API_KEY;
+  // Deliberately unreachable (nothing listens on port 1) — this file checks
+  // that /api/graphql degrades gracefully with no Mongo available, not the
+  // happy path. See clips.test.mjs and graphql.test.mjs for real-data
+  // coverage against an ephemeral in-memory MongoDB.
+  process.env.MONGODB_URI = 'mongodb://127.0.0.1:1/voice-studio';
   server = createServer().listen(0);
   await new Promise((resolve) => server.once('listening', resolve));
   base = `http://localhost:${server.address().port}`;
@@ -76,4 +81,19 @@ describe('proxy routes', () => {
     const body = await res.json();
     expect(body.error).toMatch(/text is required/);
   });
+
+  it('degrades /api/graphql to a GraphQL error, not a crash, when Mongo is unreachable', async () => {
+    const res = await fetch(`${base}/api/graphql`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ query: '{ clipStats { totalClips } }' }),
+    });
+    // The server is still up and answers with a well-formed GraphQL error
+    // response — synthesis (the feature that matters) never depends on this.
+    const body = await res.json();
+    expect(body.errors?.length).toBeGreaterThan(0);
+
+    const health = await fetch(`${base}/api/health`);
+    expect(health.status).toBe(200);
+  }, 10_000);
 });

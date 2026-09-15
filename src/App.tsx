@@ -4,14 +4,23 @@ import { TextInput } from './components/TextInput';
 import { VoicePicker } from './components/VoicePicker';
 import { VoiceSettings } from './components/VoiceSettings';
 import { ResultList } from './components/ResultList';
+import { HistoryPanel } from './components/HistoryPanel';
 import { StatusBar } from './components/StatusBar';
 import { useVoices } from './hooks/useVoices';
 import { useSpeech } from './hooks/useSpeech';
+import { useClipHistory } from './hooks/useClipHistory';
 import { DEFAULT_SETTINGS, TEXT_MAX, type VoiceSettings as Settings } from './types';
 
 export default function App() {
   const { voices, loading: voicesLoading, error: voicesError, reload } = useVoices();
   const { status, error, clips, speak, remove, clear } = useSpeech();
+  const {
+    clips: historyClips,
+    stats: historyStats,
+    loading: historyLoading,
+    error: historyError,
+    reload: reloadHistory,
+  } = useClipHistory();
 
   const [text, setText] = useState('');
   const [voiceId, setVoiceId] = useState('');
@@ -26,6 +35,11 @@ export default function App() {
     () => voices.find((v) => v.voiceId === voiceId),
     [voices, voiceId],
   );
+
+  // Pull in the newly-recorded clip once a synthesis finishes.
+  useEffect(() => {
+    if (status === 'ready') reloadHistory();
+  }, [status, reloadHistory]);
 
   const trimmed = text.trim();
   const canSpeak =
@@ -68,6 +82,14 @@ export default function App() {
           </div>
 
           <ResultList clips={clips} onRemove={remove} onClear={clear} />
+
+          <HistoryPanel
+            clips={historyClips}
+            stats={historyStats}
+            loading={historyLoading}
+            error={historyError}
+            onReload={reloadHistory}
+          />
         </div>
 
         <aside className="column column--side" aria-label="Voice and delivery settings">

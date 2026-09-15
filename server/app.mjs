@@ -2,6 +2,9 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
+import { createHandler } from 'graphql-http/lib/use/express';
+import { recordClip } from './clips.mjs';
+import { rootValue, schema } from './schema.mjs';
 
 const ELEVENLABS_BASE = 'https://api.elevenlabs.io/v1';
 
@@ -113,6 +116,8 @@ export function createServer() {
     const body = req.body ?? {};
     const text = typeof body.text === 'string' ? body.text.trim() : '';
     const voiceId = typeof body.voiceId === 'string' ? body.voiceId.trim() : '';
+    // Display-only, for the persisted history — never sent to ElevenLabs.
+    const voiceName = typeof body.voiceName === 'string' && body.voiceName.trim() ? body.voiceName.trim() : voiceId;
 
     if (!text) {
       res.status(400).json({ error: 'text is required.' });
@@ -163,14 +168,26 @@ export function createServer() {
       res.setHeader('content-type', 'audio/mpeg');
       res.setHeader('cache-control', 'no-store');
 
-      // Pipe the upstream Web ReadableStream to the Node response.
+      // Pipe the upstream Web ReadableStream to the Node response, counting
+      // bytes as they go so the history record below has a real size without
+      // buffering the whole clip in memory first.
+      let bytesStreamed = 0;
       const reader = upstream.body.getReader();
       for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
+        bytesStreamed += value.byteLength;
         res.write(Buffer.from(value));
       }
       res.end();
+
+      // Fire-and-forget: history is a nice-to-have on top of synthesis, not
+      // a precondition for it. A Mongo hiccup must never slow the response
+      // the browser is waiting on, so this is neither awaited nor allowed to
+      // throw past this handler.
+      recordClip({ voiceId, voiceName, text, bytes: bytesStreamed }).catch((err) => {
+        console.warn('Could not record clip history:', err.message ?? err);
+      });
     } catch (err) {
       if (!res.headersSent) {
         res.status(502).json({ error: 'Could not reach ElevenLabs.', detail: String(err) });
@@ -179,6 +196,10 @@ export function createServer() {
       }
     }
   });
+
+  // Read-only history API. GraphQL over the persisted clip metadata —
+  // never the audio itself, which stays client-side as a blob URL.
+  app.all('/api/graphql', createHandler({ schema, rootValue }));
 
   // In production (`npm run build` then `npm start`) serve the static front end
   // from the same process. In dev this directory does not exist and Vite serves

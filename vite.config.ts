@@ -23,5 +23,16 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     css: false,
+    server: {
+      // graphql-js does its own `instanceof GraphQLSchema` checks internally.
+      // Left to Vitest's default per-file module graph, `graphql` (built by
+      // schema.mjs) and `graphql`-as-seen-by-graphql-http end up as two
+      // separate module instances across test files, and that check fails
+      // with "Cannot use GraphQLSchema from another module or realm" even
+      // though it's the same package on disk. Inlining forces one shared
+      // instance. See server/graphql.test.mjs and app.test.mjs's
+      // "degrades /api/graphql" case.
+      deps: { inline: ['graphql', 'graphql-http'] },
+    },
   },
 });

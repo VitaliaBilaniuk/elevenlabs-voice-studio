@@ -2,7 +2,7 @@
   "name": "elevenlabs-voice-studio",
   "version": "1.0.0",
   "private": true,
-  "description": "A small text-to-speech studio built on the ElevenLabs API: a React + TypeScript front end with a Node proxy that keeps the API key server-side.",
+  "description": "A small text-to-speech studio built on the ElevenLabs API: React + TypeScript front end, Node/Express proxy, MongoDB-backed history exposed over GraphQL.",
   "type": "module",
   "engines": {
     "node": ">=18.17"
@@ -20,7 +20,10 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "graphql": "^16.9.0",
+    "graphql-http": "^1.23.0",
+    "mongodb": "^7.6.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
@@ -39,6 +42,7 @@
     "eslint-plugin-react-refresh": "^0.4.16",
     "globals": "^15.14.0",
     "jsdom": "^25.0.1",
+    "mongodb-memory-server": "^11.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "typescript": "^5.7.2",
