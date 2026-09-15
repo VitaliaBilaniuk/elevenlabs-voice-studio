@@ -83,7 +83,8 @@ src/
     useTheme.ts   light / dark, persisted
   components/     Header, TextInput, VoicePicker, VoiceSettings, ResultList, StatusBar
   App.tsx         wiring
-  test/           format, useSpeech, and VoiceSettings specs + setup
+  test/           format, useSpeech, VoiceSettings, App and accessibility specs + setup
+                  a11y.ts wraps axe-core into a single assertion helper
 ```
 
 ## How a request flows
@@ -98,6 +99,38 @@ src/
  URL.createObjectURL(blob)
  <audio src=blob:…>
 ```
+
+## Accessibility
+
+Audited by hand against WCAG 2.2 AA, then backed with an automated check so it
+doesn't regress silently:
+
+- **Landmarks + skip link.** `header`/`main`/`aside`/`footer` are real landmarks,
+  and a skip link (`Skip to script and generate`) jumps keyboard users past the
+  header straight to the form — try tabbing from the top of the page.
+- **Every control has a name, and repeated ones are distinguishable.** The clip
+  list can hold up to eight items; before the audit, all eight "Download" links
+  had the identical accessible name "Download". They're now labeled
+  `Download {voice} clip, generated {time}`, and the same for "Remove" and each
+  `<audio>` element — the fix a screen reader user actually needs when there's
+  more than one of something on the page.
+- **Form-control boundaries meet the 3:1 non-text contrast minimum (SC 1.4.11).**
+  The textarea and select used to sit on the exact same background as the page,
+  with only a ~1.3:1 border between them — effectively invisible for low-vision
+  users. They now sit on `--surface` with a `--border-strong` token computed to
+  clear 3:1 against it in both themes.
+- **`prefers-reduced-motion` is honored.** The pulsing "generating" status dot
+  turns into a static one for anyone who's asked their OS to reduce motion.
+- **Automated regression coverage.** `src/test/a11y.ts` runs `axe-core` against
+  the rendered DOM in every accessibility test (`color-contrast` disabled there
+  only because jsdom does no layout, so it can't compute rendered color —
+  contrast is verified by hand instead, see the `--border-strong` comment in
+  `index.css`). These run in the normal `npm test` / CI pass, not a separate job.
+
+What this doesn't cover: a real screen-reader pass (VoiceOver/NVDA) and a
+manual keyboard walkthrough beyond the skip link. axe-core catches structural
+issues — missing names, bad ARIA, landmark problems — not everything a human
+using assistive tech would notice.
 
 ## Notes and limits
 

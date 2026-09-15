@@ -10,6 +10,11 @@
   --surface: #ffffff;
   --surface-muted: #f0f1f4;
   --border: #e2e4e9;
+  /* Stronger than --border: meets WCAG 1.4.11 (3:1 non-text contrast) against
+     --surface, for the controls whose boundary is their only affordance
+     (text inputs, selects). --border stays for panels, which are also set
+     off by --shadow. */
+  --border-strong: #6b7280;
   --text: #1b1d22;
   --text-soft: #5c6069;
   --accent: #4f46e5;
@@ -24,6 +29,7 @@
   --surface: #16181d;
   --surface-muted: #1d2026;
   --border: #2a2d35;
+  --border-strong: #6b7280;
   --text: #e9eaed;
   --text-soft: #9aa0ab;
   --accent: #8b7dff;
@@ -171,8 +177,10 @@ code {
   width: 100%;
   font: inherit;
   color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--border);
+  /* Distinct from the page background (not --bg) so the field reads as a
+     control, not a hole in the page. */
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   padding: 10px 12px;
 }
@@ -332,6 +340,51 @@ input[type='checkbox']:focus-visible {
   50% {
     opacity: 0.3;
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .statusbar__dot--loading {
+    animation: none;
+  }
+}
+
+/* Accessibility utilities ------------------------------------- */
+.skip-link {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: translateY(-120%);
+  background: var(--accent);
+  color: var(--accent-text);
+  padding: 10px 16px;
+  border-radius: 0 0 var(--radius-sm) 0;
+  font-weight: 600;
+  text-decoration: none;
+  z-index: 100;
+  transition: transform 0.12s ease;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+/* The skip link's target: programmatically focusable (tabIndex={-1}) so
+   focus actually moves there, but not meant to show its own ring — the
+   skip link itself is the visible affordance. */
+.layout:focus {
+  outline: none;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* Notices ------------------------------------------------- */

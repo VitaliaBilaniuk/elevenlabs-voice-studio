@@ -44,9 +44,13 @@ export default function App() {
 
   return (
     <div className="app">
+      <a href="#main-content" className="skip-link">
+        Skip to script and generate
+      </a>
+
       <Header />
 
-      <main className="layout">
+      <main className="layout" id="main-content" tabIndex={-1}>
         <div className="column">
           <TextInput value={text} onChange={setText} />
 
@@ -66,7 +70,7 @@ export default function App() {
           <ResultList clips={clips} onRemove={remove} onClear={clear} />
         </div>
 
-        <aside className="column column--side">
+        <aside className="column column--side" aria-label="Voice and delivery settings">
           <VoicePicker
             voices={voices}
             loading={voicesLoading}

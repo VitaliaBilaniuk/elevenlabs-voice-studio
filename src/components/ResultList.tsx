@@ -43,15 +43,27 @@ export function ResultList({ clips, onRemove, onClear }: Props) {
               </span>
             </div>
             <p className="clip__text">{truncate(clip.text, 120)}</p>
-            <audio className="clip__audio" src={clip.url} controls preload="none" />
+            <audio
+              className="clip__audio"
+              src={clip.url}
+              controls
+              preload="none"
+              aria-label={`${clip.voiceName} clip, generated ${formatTime(clip.createdAt)}`}
+            />
             <div className="clip__actions">
-              <a className="button button--ghost" href={clip.url} download={downloadName(clip)}>
+              <a
+                className="button button--ghost"
+                href={clip.url}
+                download={downloadName(clip)}
+                aria-label={`Download ${clip.voiceName} clip, generated ${formatTime(clip.createdAt)}`}
+              >
                 Download
               </a>
               <button
                 type="button"
                 className="button button--link"
                 onClick={() => onRemove(clip.id)}
+                aria-label={`Remove ${clip.voiceName} clip, generated ${formatTime(clip.createdAt)}`}
               >
                 Remove
               </button>
